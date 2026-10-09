@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Uisge – Das Strategiespiel</title>
+<style>
+:root{--bg:#101916;--panel:#192620;--line:#40574a;--gold:#d9b779;--cream:#f2ead8;--muted:#b7c4b8}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#26392e,#101916 65%);color:var(--cream);font-family:system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh}
+header{padding:24px 18px 12px;text-align:center}h1{font-family:Georgia,serif;letter-spacing:.14em;font-size:clamp(2rem,5vw,3.3rem);margin:0;color:var(--gold)}header p{color:var(--muted);margin:7px 0 0}
+main{width:min(1100px,100%);margin:auto;padding:16px;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px}
+.card{background:#192620eF;border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:0 14px 40px #0004}
+.board-wrap{max-width:760px;margin:auto}.board{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;background:#3b4c40;padding:7px;border:2px solid var(--gold);border-radius:10px;aspect-ratio:7/6}
+.cell{position:relative;border:1px solid #607364;border-radius:5px;background:linear-gradient(145deg,#27392f,#1a2921);display:grid;place-items:center;min-width:0;cursor:pointer;transition:background .12s,transform .12s}
+.cell:hover{background:#344b3b}.cell.selected{outline:3px solid #f2d28f;outline-offset:-3px;background:#526346}.cell.target:after{content:"";width:22%;height:22%;border-radius:50%;background:#e6d29b;box-shadow:0 0 0 5px #e6d29b2c}.cell:focus-visible{outline:3px solid white}
+.piece{width:72%;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;font-size:clamp(12px,2.5vw,25px);font-weight:700;box-shadow:inset 0 3px 5px #fff5,inset 0 -5px 7px #0005,0 3px 5px #0006;border:2px solid #ffffff60}
+.white{background:radial-gradient(circle at 35% 25%,#fff8df,#d6c6a1 70%);color:#493b25;border-color:#fff0cf}.black{background:radial-gradient(circle at 35% 25%,#69766b,#27332c 70%);color:#f1d9a3;border-color:#9ba99a}
+.coord{position:absolute;left:4px;top:2px;font-size:9px;color:#91a394;opacity:.7;pointer-events:none}
+h2{font-size:1.08rem;color:var(--gold);margin:0 0 12px} .status{font-size:1.05rem;line-height:1.45;padding:12px;background:#101a15;border-radius:10px;border-left:3px solid var(--gold);margin-bottom:14px}
+button,select{font:inherit;color:var(--cream);background:#2b4033;border:1px solid #637b68;border-radius:9px;padding:10px 12px;cursor:pointer}button:hover{background:#3a5542}button:disabled{opacity:.45;cursor:not-allowed}.actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.actions button{flex:1}
+.small{font-size:.88rem;color:var(--muted);line-height:1.5}.rules{padding-left:18px;color:#d7e0d8;font-size:.9rem;line-height:1.5}.rules li{margin:7px 0}.legend{display:flex;gap:12px;flex-wrap:wrap;margin:10px 0 0;font-size:.85rem;color:var(--muted)}.legend span{display:flex;align-items:center;gap:6px}.dot{width:15px;height:15px;border-radius:50%;display:inline-block;border:1px solid #aaa}textarea{font:12px ui-monospace,SFMono-Regular,monospace;resize:vertical} .history{max-height:125px;overflow:auto;font-size:.85rem;color:var(--muted);padding-left:20px}.foot{text-align:center;padding:0 16px 22px;color:#8fa092;font-size:.78rem}
+@media(max-width:780px){main{grid-template-columns:1fr;padding:10px}.card{padding:12px}.side{display:grid;grid-template-columns:1fr;gap:14px}.board{gap:3px;padding:5px}.coord{font-size:7px}}
+</style>
+</head>
+<body>
+<header><h1>UISGE</h1><p>Ein taktisches Spiel um Kronen und Zusammenhalt</p></header>
+<main>
+<section class="card">
+ <div class="board-wrap"><div id="board" class="board" role="grid" aria-label="Uisge-Spielbrett"></div></div>
+ <div class="legend"><span><i class="dot" style="background:#e7d9b7"></i> Weiß</span><span><i class="dot" style="background:#3b493f"></i> Schwarz</span><span>♛ = König · leer = Bauer</span></div>
+ <div class="actions"><button id="undo">↶ Zug zurück</button><button id="restart">Neue Partie</button><button id="rulesToggle">Regeln ein-/ausblenden</button></div>
+ <p class="small">Tipp: Wähle einen eigenen Stein. Die erlaubten Zielfelder werden markiert. Ein Sprung dreht den Stein automatisch um.</p>
+</section>
+<aside class="side">
+ <section class="card"><h2>Spielmodus</h2>
+ <label class="small" for="mode">Gegner</label><select id="mode" style="width:100%;margin:6px 0 10px">
+ <option value="local">Zwei Spieler an einem Gerät</option><option value="ai">Gegen den Computer (du spielst Weiß)</option><option value="online">Online mit Freund/in</option></select>
+ <div id="onlinePanel" hidden>
+  <p class="small">Direkte Verbindung zwischen zwei Browsern. Beide öffnen diese HTML-Datei. Kein Konto nötig. Zum Verbinden müssen Angebot und Antwort über einen Messenger ausgetauscht werden.</p>
+  <div class="actions"><button id="createOffer">Raum erstellen</button><button id="createAnswer">Mit Angebot beitreten</button></div>
+  <label class="small" for="signalIn">Angebot / Antwort</label><textarea id="signalIn" rows="5" style="width:100%;margin-top:6px;background:#101a15;color:#f2ead8;border:1px solid #637b68;border-radius:8px;padding:8px" placeholder="Hier den erhaltenen Verbindungstext einfügen"></textarea>
+  <div class="actions"><button id="applySignal">Text verarbeiten</button><button id="copySignal">Text kopieren</button></div>
+  <label class="small" for="signalOut">Dein Verbindungstext</label><textarea id="signalOut" rows="5" readonly style="width:100%;margin-top:6px;background:#101a15;color:#f2ead8;border:1px solid #637b68;border-radius:8px;padding:8px"></textarea>
+  <p id="connectionStatus" class="small">Nicht verbunden.</p>
+ </div>
+ </section>
+ <section class="card"><h2>Partie</h2><div id="status" class="status" aria-live="polite">Weiß ist am Zug.</div>
+ <p class="small">Am Zug: <strong id="turn">Weiß</strong></p>
+ <p class="small">Kronen – Weiß: <strong id="wc">0/6</strong> · Schwarz: <strong id="bc">0/6</strong></p>
+ <label class="small" for="stale">Wenn jemand keinen Zug hat:</label><br><select id="stale" style="width:100%;margin-top:6px"><option value="draw">Unentschieden</option><option value="lose">Spieler ohne Zug verliert</option><option value="win">Spieler ohne Zug gewinnt</option><option value="pass">Zug aussetzen</option></select>
+ <h2 style="margin-top:18px">Zugprotokoll</h2><ol id="history" class="history"></ol></section>
+ <section id="rules" class="card"><h2>Spielregeln</h2><ul class="rules">
+ <li>Für zwei Spieler: je sechs Steine auf einem Brett mit 7 × 6 Feldern. Alle starten als Bauern.</li>
+ <li><b>Springen:</b> Jeder eigene Stein darf waagerecht oder senkrecht über genau einen benachbarten Stein (egal welcher Farbe) auf das freie Feld dahinter springen. Danach wird er umgedreht.</li>
+ <li><b>Ziehen:</b> Nur Könige (♛) dürfen ein Feld weit waagerecht, senkrecht oder diagonal auf ein freies Feld ziehen. Dabei drehen sie sich nicht um.</li>
+ <li><b>Zusammenhalt:</b> Nach jedem Zug müssen alle zwölf Steine über waagerechte/senkrechte Nachbarschaft zu einer einzigen Gruppe verbunden sein. Diagonaler Kontakt zählt nicht.</li>
+ <li><b>Sieg:</b> Wer alle sechs eigenen Steine gleichzeitig als Könige zeigt, gewinnt.</li>
+ <li><b>Computergegner:</b> Im Modus „Gegen den Computer“ spielt die KI Schwarz und sucht einen erlaubten Zug; sie priorisiert das Umwandeln von Steinen.</li>
+ <li><b>Online:</b> Eine direkte Browser-Verbindung wird per Angebot/Antwort aufgebaut. Tauscht die Verbindungstexte über einen sicheren Messenger aus.</li>
+ </ul><p class="small">Die Regel zum Spielende bei fehlenden Zügen ist je nach Runde unterschiedlich; wähle oben die gewünschte Variante. Diagonales Springen von Königen ist in dieser Version nicht erlaubt.</p></section>
+</aside>
+</main>
+<div class="foot">Lokale Browser-Version · Spielstand bleibt während dieser Sitzung erhalten.</div>
+<script>
+const R=6,C=7;
+let board=[],turn='W',selected=null,history=[],snapshots=[],finished=false,passCount=0;
+let mode='local', pc=null, channel=null, onlineRole=null, applyingRemote=false, aiBusy=false;
+const names={W:'Weiß',B:'Schwarz'};
+function initial(){board=Array.from({length:R},()=>Array(C).fill(null));
+// Start pattern based on the published Uisge variant: two staggered groups of six.
+[[1,2],[1,3],[2,1],[2,2],[2,3],[2,4]].forEach(([r,c])=>board[r][c]={color:'W',king:false});
+[[3,2],[3,3],[3,4],[3,5],[4,3],[4,4]].forEach(([r,c])=>board[r][c]={color:'B',king:false});
+turn='W';selected=null;history=[];snapshots=[];finished=false;passCount=0;render();checkStalemate();}
+function inside(r,c){return r>=0&&r<R&&c>=0&&c<C}
+function clone(){return board.map(row=>row.map(p=>p?{...p}:null))}
+function connected(){let pieces=[];for(let r=0;r<R;r++)for(let c=0;c<C;c++)if(board[r][c])pieces.push([r,c]);
+if(pieces.length!==12)return false;let seen=new Set(),q=[pieces[0]];seen.add(pieces[0].join(','));while(q.length){let [r,c]=q.shift();for(let [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1]]){let nr=r+dr,nc=c+dc,k=nr+','+nc;if(inside(nr,nc)&&board[nr][nc]&&!seen.has(k)){seen.add(k);q.push([nr,nc])}}}return seen.size===12}
+function candidates(r,c){let p=board[r][c];if(!p||p.color!==turn)return[];let out=[];
+for(let [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1]]){let mr=r+dr,mc=c+dc,tr=r+2*dr,tc=c+2*dc;if(inside(tr,tc)&&board[mr]?.[mc]&&!board[tr][tc])out.push({r:tr,c:tc,jump:true})}
+if(p.king)for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){if(!dr&&!dc)continue;let tr=r+dr,tc=c+dc;if(inside(tr,tc)&&!board[tr][tc])out.push({r:tr,c:tc,jump:false})}
+return out.filter(m=>{let old=clone(),piece=board[r][c];board[m.r][m.c]=piece;board[r][c]=null;if(m.jump)piece.king=!piece.king;let ok=connected();board=old;return ok})}
+function allMoves(color){let save=turn;turn=color;let a=[];for(let r=0;r<R;r++)for(let c=0;c<C;c++)if(board[r][c]?.color===color)for(let m of candidates(r,c))a.push({from:[r,c],...m});turn=save;return a}
+function render(){let el=document.getElementById('board');el.innerHTML='';let targets=selected?candidates(selected.r,selected.c):[];
+for(let r=0;r<R;r++)for(let c=0;c<C;c++){let cell=document.createElement('button');cell.className='cell';cell.setAttribute('role','gridcell');cell.setAttribute('aria-label',`Reihe ${r+1}, Spalte ${c+1}`);if(selected&&selected.r===r&&selected.c===c)cell.classList.add('selected');if(targets.some(m=>m.r===r&&m.c===c))cell.classList.add('target');
+let coord=document.createElement('span');coord.className='coord';coord.textContent=String.fromCharCode(65+c)+(r+1);cell.append(coord);let p=board[r][c];if(p){let piece=document.createElement('span');piece.className='piece '+(p.color==='W'?'white':'black');piece.textContent=p.king?'♛':'';cell.append(piece)}
+cell.onclick=()=>clickCell(r,c);el.append(cell)}
+document.getElementById('turn').textContent=names[turn];
+document.getElementById('wc').textContent=board.flat().filter(p=>p?.color==='W'&&p.king).length+'/6';
+document.getElementById('bc').textContent=board.flat().filter(p=>p?.color==='B'&&p.king).length+'/6';
+document.getElementById('undo').disabled=!snapshots.length||finished;
+let h=document.getElementById('history');h.innerHTML='';
+history.slice().reverse().forEach(s=>{let li=document.createElement('li');li.textContent=s;h.append(li)});
+}
+document.getElementById('wc').textContent=board.flat().filter(p=>p?.color==='W'&&p.king).length+'/6';document.getElementById('bc').textContent=board.flat().filter(p=>p?.color==='B'&&p.king).length+'/6';
+document.getElementById('undo').disabled=!snapshots.length||finished;let h=document.getElementById('history');h.innerHTML='';history.slice().reverse().forEach(s=>{let li=document.createElement('li');li.textContent=s;h.append(li)});
+function clickCell(r,c){if(finished)return;
+if(mode==='online' && ((onlineRole==='host'&&turn!=='W')||(onlineRole==='guest'&&turn!=='B')))return;
+let p=board[r][c];if(selected){let opts=candidates(selected.r,selected.c),m=opts.find(x=>x.r===r&&x.c===c);if(m){doMove(selected.r,selected.c,m);return}}
+if(p&&p.color===turn){selected={r,c};render()}else{selected=null;render()}}
+function doMove(r,c,m){snapshots.push({board:clone(),turn,history:[...history],passCount});let p=board[r][c],from=String.fromCharCode(65+c)+(r+1),to=String.fromCharCode(65+m.c)+(m.r+1);board[m.r][m.c]=p;board[r][c]=null;if(m.jump)p.king=!p.king;history.push(`${names[turn]}: ${from} → ${to}${m.jump?' (Sprung, umgedreht)':' (Zug)'}`);selected=null;passCount=0;
+let crowns=board.flat().filter(x=>x?.color===turn&&x.king).length;if(crowns===6){finished=true;render();document.getElementById('status').textContent=`${names[turn]} gewinnt! Alle sechs Steine sind Könige.`;return}
+turn=turn==='W'?'B':'W';render();checkStalemate();
+if(!finished && mode==='ai' && turn==='B') setTimeout(makeAIMove,450);
+if(!applyingRemote && mode==='online' && channel && channel.readyState==='open') {
+ try { channel.send(JSON.stringify({type:'move',from:[r,c],to:[m.r,m.c],jump:m.jump,board:board,turn:turn,history:history,finished:finished})); } catch(e) {}
+ }}
+function checkStalemate(){if(finished)return;if(allMoves(turn).length)return;let mode=document.getElementById('stale').value;if(mode==='lose'){finished=true;document.getElementById('status').textContent=`${names[turn]} hat keinen erlaubten Zug – ${names[turn==='W'?'B':'W']} gewinnt.`}
+else if(mode==='win'){finished=true;document.getElementById('status').textContent=`${names[turn]} hat keinen erlaubten Zug – ${names[turn]} gewinnt.`}
+else if(mode==='draw'){finished=true;document.getElementById('status').textContent='Keine erlaubten Züge – die Partie endet unentschieden.'}
+else{passCount++;if(passCount>=2){finished=true;document.getElementById('status').textContent='Beide Spieler können nicht ziehen – Partie beendet.'}else{document.getElementById('status').textContent=`${names[turn]} setzt aus (kein erlaubter Zug).`;turn=turn==='W'?'B':'W';render();checkStalemate();return}}
+render()}
+document.getElementById('undo').onclick=()=>{if(!snapshots.length)return;let s=snapshots.pop();board=s.board;turn=s.turn;history=s.history;passCount=s.passCount;finished=false;selected=null;render();document.getElementById('status').textContent=`${names[turn]} ist am Zug.`};
+document.getElementById('restart').onclick=()=>{if(confirm('Neue Partie beginnen? Der aktuelle Spielstand geht verloren.')){initial();if(mode==='ai'&&turn==='B')setTimeout(makeAIMove,350);}};
+document.getElementById('rulesToggle').onclick=()=>{let r=document.getElementById('rules');r.hidden=!r.hidden};
+document.getElementById('stale').onchange=()=>{if(!finished)checkStalemate()};
+
+function setStatus(t){document.getElementById('status').textContent=t}
+function legalMovesFor(color){
+ const save=turn;turn=color;let moves=[];
+ for(let r=0;r<R;r++)for(let c=0;c<C;c++)if(board[r][c]?.color===color)
+  for(const m of candidates(r,c))moves.push({r,c,toR:m.r,toC:m.c,jump:m.jump});
+ turn=save;return moves;
+}
+function makeAIMove(){
+ if(finished||mode!=='ai'||turn!=='B'||aiBusy)return;
+ aiBusy=true;
+ const moves=legalMovesFor('B');
+ if(!moves.length){aiBusy=false;checkStalemate();return}
+ // Simple, transparent heuristic: prefer converting own stones to kings and avoid leaving a king-count behind.
+ let best=[],bestScore=-1e9;
+ for(const m of moves){
+  const old=clone(),oldTurn=turn;let p=board[m.r][m.c];
+  board[m.toR][m.toC]=p;board[m.r][m.c]=null;if(m.jump)p.king=!p.king;
+  let score=(m.jump?8:0)+(p.king?2:0)+Math.random()*1.5;
+  const own=board.flat().filter(x=>x?.color==='B'&&x.king).length;
+  const theirs=board.flat().filter(x=>x?.color==='W'&&x.king).length;
+  score+=own*4-theirs*2;
+  if(!connected())score-=10000;
+  board=old;turn=oldTurn;
+  if(score>bestScore){bestScore=score;best=[m]}else if(score===bestScore)best.push(m)
+ }
+ const m=best[Math.floor(Math.random()*best.length)];
+ doMove(m.r,m.c,{r:m.toR,c:m.toC,jump:m.jump});
+ aiBusy=false;
+}
+function syncRemoteState(data){
+ applyingRemote=true;
+ board=data.board;turn=data.turn;history=data.history||history;finished=!!data.finished;selected=null;
+ render();
+ if(finished)setStatus('Die Partie ist beendet.');
+ else setStatus(`${names[turn]} ist am Zug (online).`);
+ applyingRemote=false;
+}
+function attachChannel(ch){
+ channel=ch;
+ channel.onopen=()=>{document.getElementById('connectionStatus').textContent='Verbunden!';setStatus('Online verbunden. Weiß beginnt.');};
+ channel.onclose=()=>document.getElementById('connectionStatus').textContent='Verbindung geschlossen.';
+ channel.onerror=()=>document.getElementById('connectionStatus').textContent='Verbindungsfehler.';
+ channel.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.type==='state')syncRemoteState(d);else if(d.type==='move')syncRemoteState(d)}catch(err){console.error(err)}};
+}
+function ensurePC(){
+ if(pc)pc.close();
+ pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+ pc.onicecandidate=()=>{if(!pc||pc.iceGatheringState!=='complete')return;document.getElementById('signalOut').value=JSON.stringify(pc.localDescription);};
+ pc.ondatachannel=e=>attachChannel(e.channel);
+ pc.onconnectionstatechange=()=>{document.getElementById('connectionStatus').textContent='Verbindungsstatus: '+pc.connectionState};
+ return pc;
+}
+async function waitIce(p){
+ if(p.iceGatheringState==='complete')return;
+ await new Promise(resolve=>{const timer=setTimeout(resolve,8000);p.addEventListener('icegatheringstatechange',function f(){if(p.iceGatheringState==='complete'){clearTimeout(timer);p.removeEventListener('icegatheringstatechange',f);resolve()}})});
+}
+document.getElementById('mode').onchange=e=>{
+ mode=e.target.value;document.getElementById('onlinePanel').hidden=mode!=='online';
+ selected=null;render();
+ if(mode==='ai'&&turn==='B'&&!finished)setTimeout(makeAIMove,350);
+ if(mode==='online')setStatus('Online-Modus: erst verbinden, dann spielen.');
+ else if(mode==='local')setStatus(`${names[turn]} ist am Zug.`);
+};
+document.getElementById('createOffer').onclick=async()=>{
+ try{mode='online';onlineRole='host';ensurePC();attachChannel(pc.createDataChannel('uisge'));await pc.setLocalDescription(await pc.createOffer());await waitIce(pc);document.getElementById('signalOut').value=JSON.stringify(pc.localDescription);document.getElementById('connectionStatus').textContent='Angebot erstellt. Text an die andere Person senden.'}
+ catch(e){document.getElementById('connectionStatus').textContent='Fehler beim Erstellen: '+e.message}
+};
+document.getElementById('createAnswer').onclick=()=>{
+ mode='online';onlineRole='guest';ensurePC();document.getElementById('connectionStatus').textContent='Füge das Angebot ein und klicke auf „Text verarbeiten“.';
+};
+document.getElementById('applySignal').onclick=async()=>{
+ try{
+  const obj=JSON.parse(document.getElementById('signalIn').value.trim());
+  if(!pc)ensurePC();
+  if(obj.type==='offer'){
+   onlineRole='guest';await pc.setRemoteDescription(obj);const ans=await pc.createAnswer();await pc.setLocalDescription(ans);await waitIce(pc);document.getElementById('signalOut').value=JSON.stringify(pc.localDescription);document.getElementById('connectionStatus').textContent='Antwort erstellt. Zurück an die Person senden, die den Raum erstellt hat.';
+  }else if(obj.type==='answer'){
+   await pc.setRemoteDescription(obj);document.getElementById('connectionStatus').textContent='Antwort übernommen. Verbinde …';
+  }else throw new Error('Das ist kein gültiger Angebot-/Antworttext.');
+ }catch(e){document.getElementById('connectionStatus').textContent='Verbindungstext ungültig oder unvollständig: '+e.message}
+};
+document.getElementById('copySignal').onclick=async()=>{
+ const out=document.getElementById('signalOut');out.select();out.setSelectionRange(0,out.value.length);
+ try{await navigator.clipboard.writeText(out.value);document.getElementById('connectionStatus').textContent='Verbindungstext kopiert.'}
+ catch(e){document.getElementById('connectionStatus').textContent='Text markiert – kopiere ihn mit Strg+C bzw. ⌘C.'}
+};
+
+initial();
+</script>
+</body></html>
